@@ -199,11 +199,11 @@ describe('Delphi package (.dpk) consumers', () => {
 
   it('connects a package to the units it contains and the units that use it', async () => {
     fs.mkdirSync(path.join(directory, 'Components'));
-    fs.writeFileSync(path.join(directory, 'Components', 'XRayCalcVisualControls.dpk'), VISUAL_CONTROLS);
-    fs.writeFileSync(path.join(directory, 'Components', 'unit_XRCGrid.pas'),
-      'unit unit_XRCGrid;\ninterface\ntype TGrid = class end;\nimplementation\nend.');
-    fs.writeFileSync(path.join(directory, 'Components', 'unit_StaticTip.pas'),
-      'unit unit_StaticTip;\ninterface\ntype TTip = class end;\nimplementation\nend.');
+    fs.writeFileSync(path.join(directory, 'Components', 'ExampleVisualControls.dpk'), VISUAL_CONTROLS);
+    fs.writeFileSync(path.join(directory, 'Components', 'ExampleGrid.pas'),
+      'unit ExampleGrid;\ninterface\ntype TGrid = class end;\nimplementation\nend.');
+    fs.writeFileSync(path.join(directory, 'Components', 'ExampleTip.pas'),
+      'unit ExampleTip;\ninterface\ntype TTip = class end;\nimplementation\nend.');
     graph = await CodeGraph.init(directory, { index: true });
 
     const files = graph.getNodesByKind('file');
@@ -214,11 +214,11 @@ describe('Delphi package (.dpk) consumers', () => {
       .map((n) => `${n.kind}:${n.name}:${path.basename(n.filePath)}`)
       .sort();
     expect(targets).toEqual([
-      'module:unit_StaticTip:unit_StaticTip.pas',
-      'module:unit_XRCGrid:unit_XRCGrid.pas',
+      'module:ExampleGrid:ExampleGrid.pas',
+      'module:ExampleTip:ExampleTip.pas',
     ]);
     expect(graph.getNodesByKind('module').map((n) => n.name).sort())
-      .toEqual(['XRayCalcVisualControls', 'unit_StaticTip', 'unit_XRCGrid']);
+      .toEqual(['ExampleGrid', 'ExampleTip', 'ExampleVisualControls']);
   });
 
   it('shows a contained unit as used by its package', async () => {
