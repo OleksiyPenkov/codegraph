@@ -11,13 +11,13 @@ beforeAll(async () => {
   await loadGrammarsForLanguages(['pascal']);
 });
 
-const VISUAL_CONTROLS = `package XRayCalcVisualControls;
+const VISUAL_CONTROLS = `package ExampleVisualControls;
 
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
-{$DESCRIPTION 'X-Ray Calc visual controls'}
+{$DESCRIPTION 'Example visual controls'}
 {$DESIGNONLY}
 {$IMPLICITBUILD ON}
 {$ENDIF IMPLICITBUILDING}
@@ -28,8 +28,8 @@ requires
   RaizeComponentsVcl;
 
 contains
-  unit_XRCGrid in 'Grid\\unit_XRCGrid.pas',
-  unit_StaticTip in '..\\Shared Tips\\unit_StaticTip.pas';
+  ExampleGrid in 'Grid\\ExampleGrid.pas',
+  ExampleTip in '..\\Shared Tips\\ExampleTip.pas';
 
 end.
 `;
@@ -45,16 +45,16 @@ function imports(source: string, file = 'Pkg.dpk') {
 
 describe('Delphi package (.dpk) extraction', () => {
   it('indexes the package as a module with its requires and contains units', () => {
-    const { result, names, signatures } = imports(VISUAL_CONTROLS, 'Components/XRayCalcVisualControls.dpk');
+    const { result, names, signatures } = imports(VISUAL_CONTROLS, 'Components/ExampleVisualControls.dpk');
     const module = result.nodes.find((n) => n.kind === 'module');
-    expect(module).toMatchObject({ name: 'XRayCalcVisualControls', language: 'pascal', startLine: 1, endLine: 21 });
-    expect(names).toEqual(['rtl', 'vcl', 'RaizeComponentsVcl', 'unit_XRCGrid', 'unit_StaticTip']);
+    expect(module).toMatchObject({ name: 'ExampleVisualControls', language: 'pascal', startLine: 1, endLine: 21 });
+    expect(names).toEqual(['rtl', 'vcl', 'RaizeComponentsVcl', 'ExampleGrid', 'ExampleTip']);
     expect(signatures).toEqual([
       'requires rtl',
       'requires vcl',
       'requires RaizeComponentsVcl',
-      "contains unit_XRCGrid in 'Grid\\unit_XRCGrid.pas'",
-      "contains unit_StaticTip in '..\\Shared Tips\\unit_StaticTip.pas'",
+      "contains ExampleGrid in 'Grid\\ExampleGrid.pas'",
+      "contains ExampleTip in '..\\Shared Tips\\ExampleTip.pas'",
     ]);
     expect(result.errors).toEqual([]);
   });
@@ -67,8 +67,8 @@ describe('Delphi package (.dpk) extraction', () => {
       ['rtl', 13, 2],
       ['vcl', 14, 2],
       ['RaizeComponentsVcl', 15, 2],
-      ['unit_XRCGrid', 18, 2],
-      ['unit_StaticTip', 19, 2],
+      ['ExampleGrid', 18, 2],
+      ['ExampleTip', 19, 2],
     ]);
     expect(new Set(refs.map((r) => r.fromNodeId))).toEqual(new Set([file.id]));
     const contained = result.edges.filter((e) => e.source === file.id && e.kind === 'contains').length;
