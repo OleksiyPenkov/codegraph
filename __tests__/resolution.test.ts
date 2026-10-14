@@ -5845,6 +5845,109 @@ end.
       expect(cg.getOutgoingEdges(useFieldRead!.id).filter((e) => e.kind === 'calls')).toEqual([]);
     });
 
+    it('records each method evaluated in an instance receiver chain (#2514)', async () => {
+      fs.writeFileSync(path.join(tempDir, 'Chain.pas'), `unit Chain;
+interface
+type
+  TSeries = class
+    Visible: Boolean;
+    procedure BeginUpdate;
+  end;
+  TPanel = class
+    function ActiveModelSeries: TSeries;
+  end;
+  TConsumer = class
+    FProjectPanel: TPanel;
+    procedure UseStatement;
+    procedure UseExplicit;
+    function UseCondition: Boolean;
+    function UseAssignment: TSeries;
+  end;
+  TDecoy = class
+    function Visible: Boolean;
+    procedure BeginUpdate;
+  end;
+implementation
+procedure TSeries.BeginUpdate; begin end;
+function TPanel.ActiveModelSeries: TSeries; begin Result := nil; end;
+procedure TConsumer.UseStatement;
+begin FProjectPanel.ActiveModelSeries.BeginUpdate; end;
+procedure TConsumer.UseExplicit;
+begin FProjectPanel.ActiveModelSeries().BeginUpdate(); end;
+function TConsumer.UseCondition: Boolean;
+begin
+  if FProjectPanel.ActiveModelSeries.Visible then Result := True;
+end;
+function TConsumer.UseAssignment: TSeries;
+begin Result := FProjectPanel.ActiveModelSeries; end;
+function TDecoy.Visible: Boolean; begin Result := False; end;
+procedure TDecoy.BeginUpdate; begin end;
+end.`);
+      cg = await CodeGraph.init(tempDir, { index: true });
+      expect(callerNamesOf('TPanel::ActiveModelSeries')).toEqual([
+        'UseAssignment', 'UseCondition', 'UseExplicit', 'UseStatement',
+      ]);
+      expect(callerNamesOf('TSeries::BeginUpdate')).toEqual(['UseExplicit', 'UseStatement']);
+      expect(callerNamesOf('TDecoy::BeginUpdate')).toEqual([]);
+      expect(callerNamesOf('TDecoy::Visible')).toEqual([]);
+    });
+
+    it('distinguishes method-pointer assignments from evaluated function results (#2514)', async () => {
+      fs.writeFileSync(path.join(tempDir, 'Provider.pas'), `unit Provider;
+interface
+type
+  TGetIntEvent = function: Integer of object;
+  TEventAlias = TGetIntEvent;
+  TProvider = class
+    function Value: Integer;
+  end;
+  TEvents = class
+    FOnGet: TEventAlias;
+    property OnGet: TEventAlias read FOnGet write FOnGet;
+  end;
+implementation
+function TProvider.Value: Integer; begin Result := 1; end;
+end.`);
+      fs.writeFileSync(path.join(tempDir, 'Consumer.pas'), `unit Consumer;
+interface
+uses Provider;
+type
+  TConsumer = class
+    FProvider: TProvider;
+    FEvents: TEvents;
+    FOnGet: TGetIntEvent;
+    procedure Wire;
+    function Evaluate: Integer;
+    property OnGet: TGetIntEvent read FOnGet write FOnGet;
+  end;
+implementation
+procedure TConsumer.Wire;
+var Callback: TEventAlias;
+begin
+  OnGet :=
+    FProvider.Value;
+  FOnGet := FProvider.Value;
+  FEvents.OnGet := FProvider.Value;
+  Callback := FProvider.Value;
+end;
+function TConsumer.Evaluate: Integer;
+var Number: Integer;
+begin
+  Number := FProvider.Value;
+  Result := FProvider.Value;
+end;
+end.`);
+      cg = await CodeGraph.init(tempDir, { index: true });
+      const value = cg.getNodesByKind('method').find(n => n.qualifiedName === 'TProvider::Value')!;
+      const wire = cg.getNodesByKind('method').find(n => n.qualifiedName === 'TConsumer::Wire')!;
+      const evaluate = cg.getNodesByKind('method').find(n => n.qualifiedName === 'TConsumer::Evaluate')!;
+      expect(cg.getOutgoingEdges(wire.id).filter(e => e.target === value.id && e.kind === 'calls')).toEqual([]);
+      expect(cg.getOutgoingEdges(wire.id).filter(e => e.target === value.id && e.kind === 'references').map(e => e.line).sort((a, b) => a! - b!))
+        .toEqual([18, 19, 20, 21]);
+      expect(cg.getOutgoingEdges(evaluate.id).filter(e => e.target === value.id && e.kind === 'calls').map(e => e.line).sort((a, b) => a! - b!))
+        .toEqual([26, 27]);
+    });
+
     it('does NOT turn a property write/read into a call edge (only statement-level dots are calls)', async () => {
       fs.writeFileSync(
         path.join(tempDir, 'main.pas'),
